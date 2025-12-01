@@ -1,6 +1,6 @@
 # Client Application
 
-This is a [Next.js](https://nextjs.org) application that's part of a apps workspace structure.
+This is a [Next.js](https://nextjs.org) application.
 
 The application uses **Next.js 16** with **React 19** and **Tailwind CSS v4**.
 
@@ -9,7 +9,7 @@ The application uses **Next.js 16** with **React 19** and **Tailwind CSS v4**.
 - **Next.js 16** - Latest Next.js framework with App Router.
 - **React 19** - Latest React version.
 - **Tailwind CSS v4** - Using shared Tailwind configuration.
-- **UI Components** - Reusable UI components from the workspace.
+- **Shadcn/UI Components** - Reusable UI components from shadcn/ui.
 - **TypeScript** - Full type safety throughout the application.
 - **Turbopack** - Fast development server with hot reloading.
 
@@ -18,7 +18,7 @@ The application uses **Next.js 16** with **React 19** and **Tailwind CSS v4**.
 First, run the development server:
 
 ```shell
-pnpm run dev
+bun run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
@@ -30,7 +30,7 @@ You can start editing the page by modifying `app/page.tsx`.
 Build the app with the integrated command:
 
 ```shell
-pnpm run build
+bun run build
 ```
 
 This will build the entire Next.js app into one.
@@ -38,36 +38,36 @@ This will build the entire Next.js app into one.
 Now start the production application.
 
 ```shell
-pnpm run start
+bun run start
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 ## Using UI Components
 
-The application uses components from the shared UI library. For example:
+The application uses components from Shadcn/UI library. For example:
 
 ```tsx
-import { Button } from "@workspace/ui/button";
+import { Button } from "@/components/ui/button";
 ```
 
 ## Configuration
 
-This application uses shared configurations from the workspace:
+This application uses biome as linter and formatter, and TypeScript for type checking:
 
-- **Biome** - Config from [@workspace/biome](../../config/biome)
-- **TypeScript** - Config from [@workspace/typescript](../../config/typescript/)
+- **Biome** - Config from [biome](biome.json)
+- **TypeScript** - Config from [typescript](tsconfig.json)
 
 ## Available Scripts
 
-- **pnpm build** - Builds the Next.js application for production
-- **pnpm clean** - Removes generated directories (node_modules, .turbo, .next)
-- **pnpm check-types** - Checks TypeScript types without emitting files
-- **pnpm dev** - Starts the development server with Turbopack
-- **pnpm format** - Formats code with Biome
-- **pnpm lint** - Lints code with Biome
-- **pnpm start** - Starts the production server
-- **pnpm update** - Updates dependencies to their latest versions
+- **bun build** - Builds the Next.js application for production
+- **bun clean** - Removes generated directories (node_modules, .turbo, .next)
+- **bun check-types** - Checks TypeScript types without emitting files
+- **bun dev** - Starts the development server with Turbopack
+- **bun format** - Formats code with Biome
+- **bun lint** - Lints code with Biome
+- **bun start** - Starts the production server
+- **bun update** - Updates dependencies to their latest versions
 
 ## Learn More
 
