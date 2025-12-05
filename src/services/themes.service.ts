@@ -7,10 +7,32 @@ import type {
   ThemeDeleteResponse,
   ApiErrorResponse,
 } from "@/types/themes.types";
+import env from "@/env";
 
-/** Base API URL from environment. */
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api/v1";
+/** Base API URL from validated environment variables. */
+const API_BASE_URL = env.NEXT_PUBLIC_API_URL;
+
+/** Session token for authenticated API requests. */
+let sessionToken: string | null = null;
+
+/**
+ * Sets the session token for authenticated API requests.
+ * Call this function after successful authentication to inject the token.
+ *
+ * @param token - The session token to use for API requests, or null to clear.
+ */
+export function setSessionToken(token: string | null): void {
+  sessionToken = token;
+}
+
+/**
+ * Gets the current session token.
+ *
+ * @returns The current session token or null if not set.
+ */
+export function getSessionToken(): string | null {
+  return sessionToken;
+}
 
 /**
  * Custom error class for API errors.
@@ -80,14 +102,21 @@ async function handleResponse<T>(response: Response): Promise<T> {
 
 /**
  * Gets the default headers for API requests.
+ * Includes the session token in the Authorization header when available.
  *
- * @returns Headers object with content type and credentials.
+ * @returns Headers object with content type and authorization.
  */
 function getHeaders(): HeadersInit {
-  return {
+  const headers: HeadersInit = {
     "Content-Type": "application/json",
-    // TODO: Add session token injection when auth is implemented.
   };
+
+  // Inject session token when available for authenticated requests.
+  if (sessionToken) {
+    headers.Authorization = `Bearer ${sessionToken}`;
+  }
+
+  return headers;
 }
 
 /**

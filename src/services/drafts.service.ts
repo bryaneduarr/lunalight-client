@@ -4,22 +4,30 @@ import type {
   DraftDeleteResponse,
 } from "@/types/drafts.types";
 import type { ApiErrorResponse } from "@/types/themes.types";
-import { ApiError } from "@/services/themes.service";
+import { ApiError, getSessionToken } from "@/services/themes.service";
+import env from "@/env";
 
-/** Base API URL from environment. */
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api/v1";
+/** Base API URL from validated environment variables. */
+const API_BASE_URL = env.NEXT_PUBLIC_API_URL;
 
 /**
  * Gets the default headers for API requests.
+ * Includes the session token in the Authorization header when available.
  *
- * @returns Headers object with content type and credentials.
+ * @returns Headers object with content type and authorization.
  */
 function getHeaders(): HeadersInit {
-  return {
+  const headers: HeadersInit = {
     "Content-Type": "application/json",
-    // TODO: Add session token injection when auth is implemented.
   };
+
+  // Inject session token when available for authenticated requests.
+  const token = getSessionToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  return headers;
 }
 
 /**
