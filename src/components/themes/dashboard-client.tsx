@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
+import { useRouter } from "next/navigation";
 import type { ThemeListItem } from "@/types/themes.types";
 import { DashboardHeader } from "@/components/themes/dashboard-header";
 import { ThemeList } from "@/components/themes/theme-list";
@@ -23,11 +24,12 @@ export function DashboardClient({
   themes,
   isLoading = false,
 }: DashboardClientProps) {
-  // Handles the create new theme action.
+  const router = useRouter();
+
+  // Handles the create new theme action - navigates to wizard.
   const handleCreateNew = useCallback(() => {
-    // TODO: Navigate to theme creation wizard or open modal.
-    console.info("Create new theme clicked.");
-  }, []);
+    router.push("/wizard");
+  }, [router]);
 
   // Handles the edit theme action.
   const handleEdit = useCallback((themeId: number) => {
