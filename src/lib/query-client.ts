@@ -81,3 +81,16 @@ export const draftKeys = {
   /** Key for a specific draft by theme ID. */
   detail: (themeId: number) => [...draftKeys.details(), themeId] as const,
 } as const;
+
+/** Query key factory for Shopify products. */
+export const shopifyProductKeys = {
+  /** Base key for all Shopify product queries. */
+  all: ["shopify-products"] as const,
+
+  /** Key for product list queries. */
+  lists: () => [...shopifyProductKeys.all, "list"] as const,
+
+  /** Key for filtered product list queries. */
+  list: (filters?: unknown) =>
+    [...shopifyProductKeys.lists(), filters ?? {}] as const,
+} as const;

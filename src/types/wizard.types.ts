@@ -60,6 +60,8 @@ export interface ProductInfo {
   price: string;
   /** Product image URL (optional). */
   imageUrl: string;
+  /** Original Shopify product ID (for imported products). */
+  shopifyProductId?: number;
 }
 
 /**
@@ -70,6 +72,8 @@ export interface ProductsData {
   sourceType: "import" | "manual";
   /** List of manually entered products. */
   manualProducts: ProductInfo[];
+  /** List of imported products from Shopify. */
+  importedProducts: ProductInfo[];
   /** Flag indicating if products have been imported. */
   hasImportedProducts: boolean;
 }

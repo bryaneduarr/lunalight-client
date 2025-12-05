@@ -115,7 +115,7 @@ export function ThemeCard({
         )}
       >
         {/* Theme Preview Area. */}
-        <div className="relative aspect-[16/10] w-full overflow-hidden bg-muted">
+        <div className="relative aspect-16/10 w-full overflow-hidden bg-muted">
           {theme.previewUrl ? (
             <Image
               src={theme.previewUrl}
@@ -126,7 +126,7 @@ export function ThemeCard({
             />
           ) : (
             // Placeholder when no preview is available.
-            <div className="flex size-full items-center justify-center bg-gradient-to-br from-muted to-muted-foreground/10">
+            <div className="flex size-full items-center justify-center bg-linear-to-br from-muted to-muted-foreground/10">
               <Palette
                 className="size-12 text-muted-foreground/30"
                 aria-hidden="true"
@@ -251,7 +251,7 @@ export function ThemeCardSkeleton() {
   return (
     <Card className="overflow-hidden">
       {/* Preview skeleton. */}
-      <Skeleton className="aspect-[16/10] w-full rounded-none" />
+      <Skeleton className="aspect-16/10 w-full rounded-none" />
 
       <CardHeader className="pb-2">
         <Skeleton className="h-5 w-3/4" />

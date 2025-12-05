@@ -73,6 +73,7 @@ const DEFAULT_WIZARD_DATA: WizardData = {
   products: {
     sourceType: "manual",
     manualProducts: [],
+    importedProducts: [],
     hasImportedProducts: false,
   },
 };

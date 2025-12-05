@@ -97,7 +97,7 @@ export function WizardProgress() {
                 {index < steps.length - 1 && (
                   <div
                     className={cn(
-                      "hidden h-0.5 w-8 flex-shrink-0 lg:block",
+                      "hidden h-0.5 w-8 shrink-0 lg:block",
                       index < currentStep ? "bg-primary" : "bg-muted",
                     )}
                     aria-hidden="true"
