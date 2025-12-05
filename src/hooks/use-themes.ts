@@ -48,25 +48,6 @@ interface UseThemesResult {
  *
  * @param options - Hook options including query parameters and enabled flag.
  * @returns Query result with themes data, loading state, and pagination.
- *
- * @example
- * ```tsx
- * function ThemesList() {
- *   const { themes, isLoading, pagination } = useThemes({
- *     params: { status: 'published', page: 1 }
- *   });
- *
- *   if (isLoading) return <Skeleton />;
- *
- *   return (
- *     <ul>
- *       {themes.map(theme => (
- *         <li key={theme.id}>{theme.name}</li>
- *       ))}
- *     </ul>
- *   );
- * }
- * ```
  */
 export function useThemes(options?: UseThemesOptions): UseThemesResult {
   const { params, enabled = true } = options ?? {};
