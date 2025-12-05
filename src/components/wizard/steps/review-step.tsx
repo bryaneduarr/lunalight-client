@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   CheckCircle2,
   Building2,
@@ -7,6 +8,8 @@ import {
   Sparkles,
   Package,
   Edit2,
+  Loader2,
+  Wand2,
 } from "lucide-react";
 import { useWizard } from "@/components/wizard/wizard-context";
 import { Button } from "@/components/ui/button";
@@ -36,11 +39,34 @@ const STEP_ICONS: Record<string, React.ReactNode> = {
  */
 export function ReviewStep() {
   const { data, goToStep, validateStep } = useWizard();
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Check if all required steps are valid.
   const allStepsValid = [0, 1, 2, 3].every(
     (index) => validateStep(index).isValid,
   );
+
+  // Get the products to display based on source type.
+  const displayProducts =
+    data.products.sourceType === "import"
+      ? data.products.importedProducts
+      : data.products.manualProducts;
+
+  // Handle generate theme action.
+  const handleGenerateTheme = async () => {
+    if (!allStepsValid) return;
+
+    setIsGenerating(true);
+
+    // TODO: Implement actual theme generation API call.
+    // For now, simulate a delay.
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    setIsGenerating(false);
+
+    // TODO: Navigate to theme editor or show result.
+    console.log("Theme generation complete", data);
+  };
 
   return (
     <Card className="border-0 shadow-none">
@@ -67,7 +93,8 @@ export function ReviewStep() {
                 aria-hidden="true"
               />
               <p className="text-green-800 text-sm dark:text-green-200">
-                All steps are complete. You're ready to generate your theme!
+                All steps are complete. You&apos;re ready to generate your
+                theme!
               </p>
             </CardContent>
           </Card>
@@ -199,19 +226,15 @@ export function ReviewStep() {
                     : "Manual Entry"}
                 </Badge>
               </div>
-              {data.products.sourceType === "manual" && (
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground text-sm">
-                    Products added:
-                  </span>
-                  <span className="font-medium">
-                    {data.products.manualProducts.length}
-                  </span>
-                </div>
-              )}
-              {data.products.manualProducts.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground text-sm">
+                  Products added:
+                </span>
+                <span className="font-medium">{displayProducts.length}</span>
+              </div>
+              {displayProducts.length > 0 && (
                 <div className="mt-2 space-y-1">
-                  {data.products.manualProducts.slice(0, 3).map((product) => (
+                  {displayProducts.slice(0, 3).map((product) => (
                     <p
                       key={product.id}
                       className="text-muted-foreground text-sm"
@@ -220,12 +243,17 @@ export function ReviewStep() {
                       {product.price && ` - ${product.price}`}
                     </p>
                   ))}
-                  {data.products.manualProducts.length > 3 && (
+                  {displayProducts.length > 3 && (
                     <p className="text-muted-foreground text-sm">
-                      +{data.products.manualProducts.length - 3} more products
+                      +{displayProducts.length - 3} more products
                     </p>
                   )}
                 </div>
+              )}
+              {displayProducts.length === 0 && (
+                <p className="text-muted-foreground text-sm">
+                  No products added (optional).
+                </p>
               )}
             </div>
           </ReviewSection>
@@ -237,7 +265,7 @@ export function ReviewStep() {
             <p className="mb-2 font-medium text-sm">What happens next?</p>
             <ul className="space-y-1 text-muted-foreground text-sm">
               <li>• AI will generate a complete Shopify Liquid theme</li>
-              <li>• You'll be able to preview and edit the result</li>
+              <li>• You&apos;ll be able to preview and edit the result</li>
               <li>• Generation typically takes 30-60 seconds</li>
               <li>
                 • You can make changes using the visual editor after generation
@@ -245,6 +273,27 @@ export function ReviewStep() {
             </ul>
           </CardContent>
         </Card>
+
+        {/* Generate button. */}
+        <Button
+          type="button"
+          size="lg"
+          onClick={handleGenerateTheme}
+          disabled={!allStepsValid || isGenerating}
+          className="w-full gap-2"
+        >
+          {isGenerating ? (
+            <>
+              <Loader2 className="size-5 animate-spin" aria-hidden="true" />
+              Generating Theme...
+            </>
+          ) : (
+            <>
+              <Wand2 className="size-5" aria-hidden="true" />
+              Generate Theme
+            </>
+          )}
+        </Button>
       </CardContent>
     </Card>
   );
