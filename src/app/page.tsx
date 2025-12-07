@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Palette, Sparkles, Zap } from "lucide-react";
+import { ArrowRight, Palette, Sparkles, Zap, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -50,9 +50,15 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* CTA Button. */}
-        <div className="pt-4">
+        {/* CTA Buttons. */}
+        <div className="flex flex-col items-center justify-center gap-4 pt-4 sm:flex-row">
           <Button asChild size="lg" className="gap-2">
+            <Link href="/login">
+              <LogIn className="size-4" aria-hidden="true" />
+              Connect Your Store
+            </Link>
+          </Button>
+          <Button asChild size="lg" variant="outline" className="gap-2">
             <Link href="/dashboard">
               Go to Dashboard
               <ArrowRight className="size-4" aria-hidden="true" />
