@@ -5,7 +5,6 @@ import {
   useContext,
   useState,
   useCallback,
-  useEffect,
   useMemo,
   type ReactNode,
 } from "react";
@@ -13,13 +12,7 @@ import type {
   WizardData,
   WizardStep,
   StepValidationResult,
-  WizardPersistState,
 } from "@/types/wizard.types";
-
-/**
- * localStorage key for wizard data persistence.
- */
-const WIZARD_STORAGE_KEY = "lunalight_wizard_progress";
 
 /**
  * Wizard steps configuration.
@@ -96,10 +89,6 @@ interface WizardContextValue {
   isCurrentStepValid: boolean;
   /** Current step validation result. */
   currentStepValidation: StepValidationResult;
-  /** Whether there are unsaved changes. */
-  hasUnsavedChanges: boolean;
-  /** Whether the wizard is loading from localStorage. */
-  isLoading: boolean;
   /** Go to next step (if valid). */
   nextStep: () => void;
   /** Go to previous step. */
@@ -113,10 +102,6 @@ interface WizardContextValue {
   ) => void;
   /** Reset wizard to initial state. */
   resetWizard: () => void;
-  /** Save current progress to localStorage. */
-  saveProgress: () => void;
-  /** Clear saved progress from localStorage. */
-  clearSavedProgress: () => void;
   /** Validate a specific step. */
   validateStep: (stepIndex: number) => StepValidationResult;
 }
@@ -218,57 +203,9 @@ interface WizardProviderProps {
  * WizardProvider component that manages wizard state and provides context.
  */
 export function WizardProvider({ children }: WizardProviderProps) {
-  // Initialize state for current step, wizard data, unsaved changes tracking, and loading state.
+  // Initialize state for current step and wizard data.
   const [currentStep, setCurrentStep] = useState(0);
   const [data, setData] = useState<WizardData>(DEFAULT_WIZARD_DATA);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Load saved progress from localStorage on mount.
-  useEffect(() => {
-    try {
-      // Retrieve persisted wizard state from localStorage by key.
-      const saved = localStorage.getItem(WIZARD_STORAGE_KEY);
-      if (saved) {
-        // Parse saved state and restore current step and data.
-        const parsed: WizardPersistState = JSON.parse(saved);
-        setCurrentStep(parsed.currentStep);
-        setData(parsed.data);
-      }
-    } catch (error) {
-      // If localStorage is corrupted, start again.
-      console.warn("Failed to load wizard progress:", error);
-    } finally {
-      // Mark loading as complete after attempting to restore state.
-      setIsLoading(false);
-    }
-  }, []);
-
-  // Auto-save to localStorage when data changes.
-  useEffect(() => {
-    // Skip auto-save if still loading from localStorage.
-    if (isLoading) return;
-
-    const saveToStorage = () => {
-      try {
-        // Build state object with current step, data, and timestamp.
-        const state: WizardPersistState = {
-          currentStep,
-          data,
-          lastSavedAt: new Date().toISOString(),
-        };
-        // Persist state to localStorage and clear unsaved changes flag.
-        localStorage.setItem(WIZARD_STORAGE_KEY, JSON.stringify(state));
-        setHasUnsavedChanges(false);
-      } catch (error) {
-        console.warn("Failed to save wizard progress:", error);
-      }
-    };
-
-    // Debounce save to avoid excessive writes to localStorage.
-    const timeoutId = setTimeout(saveToStorage, 1000);
-    return () => clearTimeout(timeoutId);
-  }, [currentStep, data, isLoading]);
 
   // Calculate total steps count and get configuration for current step.
   const totalSteps = WIZARD_STEPS.length;
@@ -322,7 +259,7 @@ export function WizardProvider({ children }: WizardProviderProps) {
     [totalSteps],
   );
 
-  // Update nested wizard data for given step key and mark as unsaved.
+  // Update nested wizard data for given step key.
   const updateData = useCallback(
     <K extends keyof WizardData>(
       stepKey: K,
@@ -336,42 +273,14 @@ export function WizardProvider({ children }: WizardProviderProps) {
           ...updates,
         },
       }));
-      // Flag that changes have not been persisted to localStorage.
-      setHasUnsavedChanges(true);
     },
     [],
   );
 
-  // Reset wizard to initial state and clear localStorage.
+  // Reset wizard to initial state.
   const resetWizard = useCallback(() => {
     setCurrentStep(0);
     setData(DEFAULT_WIZARD_DATA);
-    setHasUnsavedChanges(false);
-    // Remove persisted state from localStorage to start fresh.
-    localStorage.removeItem(WIZARD_STORAGE_KEY);
-  }, []);
-
-  // Manually save current progress to localStorage and clear unsaved flag.
-  const saveProgress = useCallback(() => {
-    try {
-      // Build state object with current step, data, and timestamp.
-      const state: WizardPersistState = {
-        currentStep,
-        data,
-        lastSavedAt: new Date().toISOString(),
-      };
-      // Persist state to localStorage and mark all changes as saved.
-      localStorage.setItem(WIZARD_STORAGE_KEY, JSON.stringify(state));
-      setHasUnsavedChanges(false);
-    } catch (error) {
-      console.warn("Failed to save wizard progress:", error);
-    }
-  }, [currentStep, data]);
-
-  // Clear persisted progress from localStorage and reset unsaved changes flag.
-  const clearSavedProgress = useCallback(() => {
-    localStorage.removeItem(WIZARD_STORAGE_KEY);
-    setHasUnsavedChanges(false);
   }, []);
 
   // Aggregate all context values into single object for provider.
@@ -383,15 +292,11 @@ export function WizardProvider({ children }: WizardProviderProps) {
     data,
     isCurrentStepValid,
     currentStepValidation,
-    hasUnsavedChanges,
-    isLoading,
     nextStep,
     prevStep,
     goToStep,
     updateData,
     resetWizard,
-    saveProgress,
-    clearSavedProgress,
     validateStep,
   };
 

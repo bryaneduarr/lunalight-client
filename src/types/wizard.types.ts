@@ -103,18 +103,6 @@ export interface StepValidationResult {
 }
 
 /**
- * Wizard state for localStorage persistence.
- */
-export interface WizardPersistState {
-  /** Current step index (0-based). */
-  currentStep: number;
-  /** Wizard form data. */
-  data: WizardData;
-  /** Timestamp of last save. */
-  lastSavedAt: string;
-}
-
-/**
  * Predefined color palette option.
  */
 export interface ColorPalette {

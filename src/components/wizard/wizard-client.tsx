@@ -21,7 +21,7 @@ export function WizardClient() {
  */
 function WizardClientInner() {
   const router = useRouter();
-  const { data, clearSavedProgress } = useWizard();
+  const { data, resetWizard } = useWizard();
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Handles theme generation - to be implemented in Feature 7.
@@ -36,8 +36,8 @@ function WizardClientInner() {
       // Simulate API call delay.
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      // Clear saved progress after successful generation.
-      clearSavedProgress();
+      // Reset wizard state after successful generation.
+      resetWizard();
 
       // Redirect to dashboard (or editor in the future).
       router.push("/dashboard");
