@@ -30,7 +30,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { isLoading: authLoading, isAuthenticated } = useAuth();
 
   // Local loading state for token refresh during navigation.
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isRefreshing] = useState(false);
   const refreshAttempted = useRef(false);
 
   // Check and refresh tokens on navigation.
@@ -40,8 +40,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
       return;
     }
 
-    // Sync from cookies to detect expired access token.
-    const { hasAccessToken, needsRefresh } = tokenService.syncFromCookies();
+    // Check auth status with server.
+    const { hasAccessToken, hasRefreshToken } = await tokenService.syncFromServer();
 
     // If we have access token, no action needed.
     if (hasAccessToken) {
@@ -49,21 +49,27 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
       return;
     }
 
-    // If we need to refresh (no access token but have refresh token).
-    if (needsRefresh && !refreshAttempted.current) {
+    // If we have refresh token but no access token, try to refresh.
+    if (hasRefreshToken && !refreshAttempted.current) {
       refreshAttempted.current = true;
-      setIsRefreshing(true);
-
       try {
         await tokenService.refreshAccessToken();
-        // Refresh succeeded - tokens are now set.
-        setIsRefreshing(false);
+        // Refresh succeeded, tokens are updated.
+        refreshAttempted.current = false;
+        return;
       } catch {
-        // Refresh failed - redirect to login.
-        setIsRefreshing(false);
+        // Refresh failed, clear tokens and redirect.
         tokenService.clearTokens();
         router.replace("/login");
+        return;
       }
+    }
+
+    // No tokens at all - redirect to login.
+    if (!hasRefreshToken && !refreshAttempted.current) {
+      refreshAttempted.current = true;
+      tokenService.clearTokens();
+      router.replace("/login");
     }
   }, [isRefreshing, authLoading, router]);
 
@@ -77,13 +83,30 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   // Also redirect if auth state says not authenticated.
   useEffect(() => {
-    if (!authLoading && !isAuthenticated && !isRefreshing) {
-      // Double-check cookies before redirecting.
-      const { hasAccessToken, needsRefresh } = tokenService.syncFromCookies();
-      if (!hasAccessToken && !needsRefresh) {
-        router.replace("/login");
+    const checkAuth = async () => {
+      if (!authLoading && !isAuthenticated && !isRefreshing) {
+        // Double-check with server before redirecting.
+        const { hasAccessToken, hasRefreshToken } = await tokenService.syncFromServer();
+        
+        // Try to refresh if we have refresh token.
+        if (!hasAccessToken && hasRefreshToken) {
+          try {
+            await tokenService.refreshAccessToken();
+            // Refresh succeeded, don't redirect.
+            return;
+          } catch {
+            // Refresh failed, proceed to redirect.
+          }
+        }
+        
+        // No tokens or refresh failed - redirect to login.
+        if (!hasAccessToken) {
+          router.replace("/login");
+        }
       }
-    }
+    };
+
+    checkAuth();
   }, [authLoading, isAuthenticated, isRefreshing, router]);
 
   // Show loading skeleton while checking auth state or refreshing.

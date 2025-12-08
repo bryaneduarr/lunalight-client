@@ -7,7 +7,6 @@ import {
   useCallback,
   useMemo,
   useEffect,
-  useRef,
 } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
@@ -77,9 +76,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     shopDomain: null,
   });
 
-  // Track if we've already started proactive refresh to avoid double calls.
-  const proactiveRefreshStarted = useRef(false);
-
   // Set up auth redirect callback for authenticated fetch.
   useEffect(() => {
     setAuthRedirectCallback(() => {
@@ -94,11 +90,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
     });
   }, [router]);
 
-  // Initialize tokens from cookies on mount and subscribe to changes.
+  // Initialize auth state from server on mount and subscribe to changes.
   useEffect(() => {
-    // Initialize tokens from cookies for page refresh persistence.
-    const { needsProactiveRefresh } = tokenService.initFromCookies();
+    let isMounted = true;
 
+    // Initialize auth state by checking with server.
+    const initAuth = async () => {
+      const result = await tokenService.initFromServer();
+
+      if (!isMounted) return;
+
+      // Update state based on server response.
+      if (result.hasAccessToken) {
+        setState({
+          isLoading: false,
+          isAuthenticated: true,
+          shopDomain: result.shopDomain,
+        });
+      } else {
+        setState({
+          isLoading: false,
+          isAuthenticated: false,
+          shopDomain: null,
+        });
+      }
+    };
+
+    // Subscribe to token changes.
     const unsubscribe = tokenService.addTokenChangeListener((tokens) => {
       // Only set authenticated when access token exists (source of truth).
       if (!tokens.accessToken && !tokens.refreshToken) {
@@ -109,72 +127,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
           shopDomain: null,
         });
       } else if (tokens.accessToken) {
-        // Access token exists - authenticated (regardless of refresh token).
+        // Access token exists - authenticated.
         setState({
           isLoading: false,
           isAuthenticated: true,
           shopDomain: tokens.shopDomain,
         });
       }
-      // If only refresh token exists without access token, keep loading state.
-      // The proactive refresh will handle getting a new access token.
     });
 
-    // Check for invalid token state (access token only, no refresh token).
-    if (!tokenService.hasValidTokenState()) {
-      // Invalid state - clear everything and redirect to login.
-      tokenService.clearTokens();
-      setState({
-        isLoading: false,
-        isAuthenticated: false,
-        shopDomain: null,
-      });
-      router.push("/login");
-      return unsubscribe;
-    }
+    // Start initialization.
+    initAuth();
 
-    // If proactive refresh is needed (refresh token exists but no access token).
-    if (needsProactiveRefresh && !proactiveRefreshStarted.current) {
-      proactiveRefreshStarted.current = true;
-      // Keep loading state while refreshing.
-      setState((prev) => ({ ...prev, isLoading: true }));
-      // Perform proactive refresh to get new access token.
-      tokenService
-        .refreshAccessToken()
-        .then(() => {
-          // Token refresh succeeded - state will be updated by listener.
-          // Access token cookie is now set, user is authenticated.
-        })
-        .catch(() => {
-          // Refresh failed - session is invalid.
-          tokenService.clearTokens();
-          setState({
-            isLoading: false,
-            isAuthenticated: false,
-            shopDomain: null,
-          });
-          router.push("/login");
-        });
-    } else if (tokenService.hasTokens()) {
-      // Has access token (hasTokens checks for access token) - authenticated.
-      setState({
-        isLoading: false,
-        isAuthenticated: true,
-        shopDomain: tokenService.getShopDomain(),
-      });
-    } else if (tokenService.hasRefreshToken()) {
-      // Only refresh token exists - keep loading and wait for refresh.
-      setState((prev) => ({ ...prev, isLoading: true }));
-    } else {
-      // No tokens at all - not authenticated.
-      setState((prev) => ({
-        ...prev,
-        isLoading: false,
-      }));
-    }
-
-    return unsubscribe;
-  }, [router]);
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, []);
 
   // Sets the authentication data after successful OAuth.
   const setAuth = useCallback(
@@ -200,31 +169,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, []);
 
-  // Re-checks authentication state from cookies.
-  const recheckAuth = useCallback(() => {
-    const { hasAccessToken, needsRefresh } = tokenService.syncFromCookies();
+  // Re-checks authentication state from server.
+  const recheckAuth = useCallback(async () => {
+    const result = await tokenService.initFromServer();
 
-    if (hasAccessToken) {
-      // Access token exists - update state if needed.
-      if (!state.isAuthenticated) {
-        setState({
-          isLoading: false,
-          isAuthenticated: true,
-          shopDomain: tokenService.getShopDomain(),
-        });
-      }
-    } else if (!needsRefresh) {
-      // No tokens at all - update state if needed.
-      if (state.isAuthenticated) {
-        setState({
-          isLoading: false,
-          isAuthenticated: false,
-          shopDomain: null,
-        });
-      }
+    if (result.hasAccessToken) {
+      // Access token exists - update state.
+      setState({
+        isLoading: false,
+        isAuthenticated: true,
+        shopDomain: result.shopDomain,
+      });
+    } else {
+      // No tokens - update state.
+      setState({
+        isLoading: false,
+        isAuthenticated: false,
+        shopDomain: null,
+      });
     }
-    // If needsRefresh is true, ProtectedRoute will handle the refresh.
-  }, [state.isAuthenticated]);
+  }, []);
 
   // Logs out the user and clears authentication data.
   const logout = useCallback(async () => {

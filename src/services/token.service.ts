@@ -3,9 +3,7 @@ import env from "@/env";
 /** Base API URL from validated environment variables. */
 const API_BASE_URL = env.NEXT_PUBLIC_API_URL;
 
-/** Cookie names for tokens (readable by proxy.ts). */
-const ACCESS_TOKEN_COOKIE = "lunalight_access_token";
-const REFRESH_TOKEN_COOKIE = "lunalight_refresh_token";
+/** Cookie names are no longer used - HTTP-only cookies cannot be read by JavaScript. */
 
 /**
  * Auth tokens stored in memory for API requests.
@@ -54,58 +52,12 @@ interface RefreshTokenResponse {
 }
 
 /**
- * JWT payload structure for decoding shop domain.
+ * JWT decoding is no longer needed - server provides auth status.
  */
-interface JwtPayload {
-  shopDomain?: string;
-}
-
 /**
- * Decodes a JWT token to extract payload without verification.
- * This is safe for client-side since we only need to read the shop domain.
- *
- * @param token - The JWT token to decode.
- * @returns The decoded payload or null if invalid.
+ * Note: HTTP-only cookies cannot be read by JavaScript.
+ * We use server-side auth status endpoint instead.
  */
-function decodeJwtPayload(token: string): JwtPayload | null {
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) {
-      return null;
-    }
-    const payload = parts[1];
-    if (!payload) {
-      return null;
-    }
-    // Base64url decode.
-    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split("")
-        .map((c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`)
-        .join(""),
-    );
-    return JSON.parse(jsonPayload);
-  } catch {
-    return null;
-  }
-}
-
-
-
-/**
- * Gets a cookie value by name.
- *
- * @param name - Cookie name.
- * @returns Cookie value or null if not found.
- */
-function getCookie(name: string): string | null {
-  if (typeof document === "undefined") {
-    return null;
-  }
-  const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
-  return match ? decodeURIComponent(match[2]) : null;
-}
 
 /**
  * Token service for managing authentication tokens.
@@ -181,84 +133,95 @@ export const tokenService = {
   },
 
   /**
-   * Checks the actual cookie state and syncs with memory.
-   * This is useful for detecting when cookies have expired.
+   * Checks the actual auth state by asking the server.
+   * HTTP-only cookies cannot be read by JavaScript.
+   * Notifies listeners when token state changes.
    *
-   * @returns Object with current cookie state.
+   * @returns Object with current auth state.
    */
-  syncFromCookies(): {
+  async syncFromServer(): Promise<{
     hasAccessToken: boolean;
     hasRefreshToken: boolean;
     needsRefresh: boolean;
-  } {
-    if (typeof document === "undefined") {
+  }> {
+    try {
+      // Check auth status with server.
+      const response = await fetch(`${API_BASE_URL}/auth/status`, {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        return {
+          hasAccessToken: false,
+          hasRefreshToken: false,
+          needsRefresh: false,
+        };
+      }
+
+      const data = await response.json();
+
+      if (data.success && data.data.isAuthenticated) {
+        // User has valid access token.
+        return {
+          hasAccessToken: true,
+          hasRefreshToken: true,
+          needsRefresh: false,
+        };
+      }
+
+      // Not authenticated, but check if refresh token exists by attempting refresh.
+      // We can't read HTTP-only cookies, so we try to refresh.
+      try {
+        const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
+          method: "POST",
+          credentials: "include",
+        });
+
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json();
+          if (refreshData.success) {
+            // Refresh token exists and is valid.
+            // Update memory state.
+            this.setTokens(
+              refreshData.data.accessToken,
+              refreshData.data.refreshToken,
+              refreshData.data.shopDomain,
+            );
+            return {
+              hasAccessToken: true,
+              hasRefreshToken: true,
+              needsRefresh: false,
+            };
+          }
+        }
+      } catch {
+        // Refresh failed, no refresh token.
+      }
+
+      // No tokens at all.
+      return {
+        hasAccessToken: false,
+        hasRefreshToken: false,
+        needsRefresh: false,
+      };
+    } catch {
       return {
         hasAccessToken: false,
         hasRefreshToken: false,
         needsRefresh: false,
       };
     }
-
-    const accessTokenCookie = getCookie(ACCESS_TOKEN_COOKIE);
-    const refreshTokenCookie = getCookie(REFRESH_TOKEN_COOKIE);
-
-    // Sync memory state with cookie state.
-    if (accessTokenCookie !== tokens.accessToken) {
-      // Access token cookie changed (likely expired).
-      if (!accessTokenCookie && tokens.accessToken) {
-        // Access token expired - clear from memory.
-        tokens.accessToken = null;
-      } else if (accessTokenCookie && !tokens.accessToken) {
-        // Access token appeared (shouldn't happen normally).
-        tokens.accessToken = accessTokenCookie;
-      }
-    }
-
-    if (refreshTokenCookie !== tokens.refreshToken) {
-      // Refresh token cookie changed.
-      if (!refreshTokenCookie && tokens.refreshToken) {
-        // Refresh token expired - clear from memory.
-        tokens.refreshToken = null;
-      } else if (refreshTokenCookie && !tokens.refreshToken) {
-        // Refresh token appeared (shouldn't happen normally).
-        tokens.refreshToken = refreshTokenCookie;
-      }
-    }
-
-    const hasAccessToken = Boolean(accessTokenCookie);
-    const hasRefreshToken = Boolean(refreshTokenCookie);
-    const needsRefresh = !hasAccessToken && hasRefreshToken;
-
-    return { hasAccessToken, hasRefreshToken, needsRefresh };
   },
 
   /**
-   * Validates current authentication state and refreshes tokens if needed.
+   * Validates current authentication state by checking with server.
    *
    * @returns Promise resolving to true if authenticated, false otherwise.
    */
   async ensureAuthenticated(): Promise<boolean> {
-    const { hasAccessToken, needsRefresh } = this.syncFromCookies();
-
-    // If we have access token, we're good.
-    if (hasAccessToken) {
-      return true;
-    }
-
-    // If we need to refresh (no access token but have refresh token).
-    if (needsRefresh) {
-      try {
-        await this.refreshAccessToken();
-        return true;
-      } catch {
-        // Refresh failed - not authenticated.
-        this.clearTokens();
-        return false;
-      }
-    }
-
-    // No tokens at all.
-    return false;
+    const { hasAccessToken } = await this.syncFromServer();
+    return hasAccessToken;
   },
 
   /**
@@ -291,44 +254,67 @@ export const tokenService = {
   },
 
   /**
-   * Initializes tokens from HTTP-only cookies on page load.
-   * Reads cookies set by the server to sync memory state.
-   * Shop domain will be retrieved from token refresh response.
+   * Initializes auth state by checking with the server.
+   * HTTP-only cookies cannot be read by JavaScript, so we ask the server.
    *
-   * @returns Object indicating if proactive refresh is needed.
+   * @returns Object indicating if tokens exist and if refresh is needed.
    */
-  initFromCookies(): { needsProactiveRefresh: boolean } {
-    if (typeof document === "undefined") {
-      return { needsProactiveRefresh: false };
-    }
+  async initFromServer(): Promise<{
+    hasAccessToken: boolean;
+    needsProactiveRefresh: boolean;
+    shopDomain: string | null;
+  }> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/status`, {
+        method: "GET",
+        credentials: "include", // Include HTTP-only cookies.
+      });
 
-    const accessToken = getCookie(ACCESS_TOKEN_COOKIE);
-    const refreshToken = getCookie(REFRESH_TOKEN_COOKIE);
+      if (!response.ok) {
+        return {
+          hasAccessToken: false,
+          needsProactiveRefresh: false,
+          shopDomain: null,
+        };
+      }
 
-    // Access token only, no refresh token is invalid state.
-    if (accessToken && !refreshToken) {
-      // Invalid state - server should handle cookie cleanup on next request.
+      const data = await response.json();
+
+      if (data.success && data.data.isAuthenticated) {
+        // User is authenticated - set tokens in memory.
+        // We don't have the actual token values, but we know they exist in cookies.
+        // Set a placeholder to indicate authenticated state.
+        tokens = {
+          accessToken: "HTTP_ONLY_COOKIE",
+          refreshToken: "HTTP_ONLY_COOKIE",
+          shopDomain: data.data.shopDomain,
+        };
+        this.notifyListeners();
+        return {
+          hasAccessToken: true,
+          needsProactiveRefresh: false,
+          shopDomain: data.data.shopDomain,
+        };
+      }
+
+      // Not authenticated.
       tokens = { accessToken: null, refreshToken: null, shopDomain: null };
       this.notifyListeners();
-      return { needsProactiveRefresh: false };
-    }
-
-    // Refresh token exists (with or without access token).
-    if (refreshToken) {
-      // Try to extract shop domain from access token if available.
-      let shopDomain: string | null = null;
-      if (accessToken) {
-        const payload = decodeJwtPayload(accessToken);
-        shopDomain = payload?.shopDomain ?? null;
-      }
-      tokens = { accessToken, refreshToken, shopDomain };
+      return {
+        hasAccessToken: false,
+        needsProactiveRefresh: false,
+        shopDomain: null,
+      };
+    } catch (_error) {
+      // Error checking auth status - assume not authenticated.
+      tokens = { accessToken: null, refreshToken: null, shopDomain: null };
       this.notifyListeners();
-      // If no access token but refresh exists, need proactive refresh.
-      return { needsProactiveRefresh: !accessToken };
+      return {
+        hasAccessToken: false,
+        needsProactiveRefresh: false,
+        shopDomain: null,
+      };
     }
-
-    // Case 3: No tokens at all.
-    return { needsProactiveRefresh: false };
   },
 
   /**
@@ -352,7 +338,7 @@ export const tokenService = {
   },
 
   /**
-   * Refreshes the access token using the refresh token.
+   * Refreshes the access token using the refresh token from HTTP-only cookie.
    *
    * Implements a queue system to prevent multiple concurrent refresh requests.
    *
@@ -367,21 +353,13 @@ export const tokenService = {
       });
     }
 
-    const refreshToken = this.getRefreshToken();
-    if (!refreshToken) {
-      throw new Error("No refresh token available.");
-    }
-
     isRefreshing = true;
 
     try {
+      // Refresh token is in HTTP-only cookie, no need to send in body.
       const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ refreshToken }),
-        credentials: "include",
+        credentials: "include", // Include HTTP-only cookies.
       });
 
       const data: RefreshTokenResponse = await response.json();
