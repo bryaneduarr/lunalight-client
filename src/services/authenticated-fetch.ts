@@ -134,10 +134,13 @@ export async function authenticatedFetch(
 
   // If unauthorized, try to refresh and retry.
   if (response.status === 401) {
-    const errorData: ApiErrorResponse = await response.clone().json().catch(() => ({
-      success: false,
-      error: { type: "UNKNOWN", message: "Unknown error" },
-    }));
+    const errorData: ApiErrorResponse = await response
+      .clone()
+      .json()
+      .catch(() => ({
+        success: false,
+        error: { type: "UNKNOWN", message: "Unknown error" },
+      }));
 
     // Check if it's a token expiration error.
     if (

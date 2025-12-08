@@ -2,7 +2,10 @@ import type {
   ListProductsParams,
   ListProductsResponse,
 } from "@/types/shopify.types";
-import { authenticatedJsonFetch, ApiError } from "@/services/authenticated-fetch";
+import {
+  authenticatedJsonFetch,
+  ApiError,
+} from "@/services/authenticated-fetch";
 import env from "@/env";
 
 /** Base API URL from validated environment variables. */
