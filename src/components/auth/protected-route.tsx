@@ -41,7 +41,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     }
 
     // Check auth status with server.
-    const { hasAccessToken, hasRefreshToken } = await tokenService.syncFromServer();
+    const { hasAccessToken, hasRefreshToken } =
+      await tokenService.syncFromServer();
 
     // If we have access token, no action needed.
     if (hasAccessToken) {
@@ -86,8 +87,9 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     const checkAuth = async () => {
       if (!authLoading && !isAuthenticated && !isRefreshing) {
         // Double-check with server before redirecting.
-        const { hasAccessToken, hasRefreshToken } = await tokenService.syncFromServer();
-        
+        const { hasAccessToken, hasRefreshToken } =
+          await tokenService.syncFromServer();
+
         // Try to refresh if we have refresh token.
         if (!hasAccessToken && hasRefreshToken) {
           try {
@@ -98,7 +100,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
             // Refresh failed, proceed to redirect.
           }
         }
-        
+
         // No tokens or refresh failed - redirect to login.
         if (!hasAccessToken) {
           router.replace("/login");
