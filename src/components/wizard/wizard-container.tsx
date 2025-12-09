@@ -10,22 +10,10 @@ import { ProductsStep } from "@/components/wizard/steps/products-step";
 import { ReviewStep } from "@/components/wizard/steps/review-step";
 
 /**
- * Props for WizardContainer component.
- */
-interface WizardContainerProps {
-  /** Callback when the user triggers theme generation from review step. */
-  onGenerate?: () => void;
-  /** Whether theme generation is in progress. */
-  isGenerating?: boolean;
-}
-
-/**
  * WizardContainer manages the wizard UI, rendering the current step and navigation.
+ * Theme generation is handled by the ReviewStep component itself.
  */
-export function WizardContainer({
-  onGenerate,
-  isGenerating = false,
-}: WizardContainerProps) {
+export function WizardContainer() {
   const { currentStep } = useWizard();
 
   // Render the current step component.
@@ -46,6 +34,9 @@ export function WizardContainer({
     }
   };
 
+  // Check if we're on the review step (last step).
+  const isReviewStep = currentStep === 4;
+
   return (
     <div className="flex min-h-[calc(100dvh-4rem)] flex-col">
       {/* Progress indicator. */}
@@ -60,15 +51,14 @@ export function WizardContainer({
         <div className="mx-auto max-w-4xl">{renderCurrentStep()}</div>
       </div>
 
-      {/* Navigation footer. */}
-      <div className="sticky bottom-0 border-t bg-background/95 px-4 py-4 backdrop-blur-sm sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-4xl">
-          <WizardNavigation
-            onGenerate={onGenerate}
-            isGenerating={isGenerating}
-          />
+      {/* Navigation footer - hidden on review step since ReviewStep has its own buttons. */}
+      {!isReviewStep && (
+        <div className="sticky bottom-0 border-t bg-background/95 px-4 py-4 backdrop-blur-sm sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-4xl">
+            <WizardNavigation />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
