@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
   Building2,
@@ -10,8 +11,11 @@ import {
   Edit2,
   Loader2,
   Wand2,
+  Save,
 } from "lucide-react";
 import { useWizard } from "@/components/wizard/wizard-context";
+import { useGenerateTheme } from "@/hooks/use-generate-theme";
+import { useCreateTheme } from "@/hooks/use-create-theme";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -22,7 +26,10 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { ThemePreview, FileTree } from "@/components/themes/theme-preview";
 import { cn } from "@/lib/utils";
+import type { GeneratedThemeData } from "@/types/theme-generation.types";
+import type { ProductInfo } from "@/types/wizard.types";
 
 /**
  * Maps step IDs to icons.
@@ -36,10 +43,32 @@ const STEP_ICONS: Record<string, React.ReactNode> = {
 
 /**
  * ReviewStep displays a summary of all wizard data for user confirmation.
+ * After generation, shows a preview of the generated theme.
  */
 export function ReviewStep() {
-  const { data, goToStep, validateStep } = useWizard();
-  const [isGenerating, setIsGenerating] = useState(false);
+  const router = useRouter();
+  const { data, goToStep, validateStep, resetWizard } = useWizard();
+
+  // State for generated theme data.
+  const [generatedTheme, setGeneratedTheme] =
+    useState<GeneratedThemeData | null>(null);
+  const [selectedFile, setSelectedFile] = useState<string | undefined>();
+
+  // Set up theme generation mutation.
+  const { mutate: generateTheme, isPending: isGenerating } = useGenerateTheme({
+    onSuccess: (themeData) => {
+      setGeneratedTheme(themeData);
+    },
+  });
+
+  // Set up theme creation mutation for saving.
+  const { createTheme, isPending: isSaving } = useCreateTheme({
+    onSuccess: () => {
+      // Reset wizard and redirect to dashboard.
+      resetWizard();
+      router.push("/dashboard");
+    },
+  });
 
   // Check if all required steps are valid.
   const allStepsValid = [0, 1, 2, 3].every(
@@ -53,21 +82,138 @@ export function ReviewStep() {
       : data.products.manualProducts;
 
   // Handle generate theme action.
-  const handleGenerateTheme = async () => {
-    if (!allStepsValid) return;
+  const handleGenerateTheme = () => {
+    if (!allStepsValid || isGenerating) return;
 
-    setIsGenerating(true);
+    // Map products to the API format.
+    const products = displayProducts.map((product: ProductInfo) => ({
+      id: product.id,
+      name: product.name,
+      description: product.description,
+      price: product.price,
+      imageUrl: product.imageUrl || undefined,
+    }));
 
-    // TODO: Implement actual theme generation API call.
-    // For now, simulate a delay.
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    setIsGenerating(false);
-
-    // TODO: Navigate to theme editor or show result.
-    console.log("Theme generation complete", data);
+    // Generate theme using the AI service.
+    generateTheme({
+      brandInfo: {
+        brandName: data.brandInfo.brandName || "Your Brand",
+        brandDescription: data.brandInfo.brandDescription || undefined,
+      },
+      colorScheme: {
+        primaryColor: data.colorStyle.primaryColor,
+        secondaryColor: data.colorStyle.secondaryColor,
+        accentColor: data.colorStyle.accentColor,
+      },
+      visionPrompt: data.visionPrompt.prompt,
+      products: products.length > 0 ? products : undefined,
+      referenceImageUrls:
+        data.colorStyle.referenceImages.length > 0
+          ? data.colorStyle.referenceImages
+          : undefined,
+    });
   };
 
+  // Handle saving the generated theme.
+  const handleSaveTheme = () => {
+    if (!generatedTheme) return;
+
+    createTheme({
+      name: generatedTheme.themeName,
+      liquidFiles: generatedTheme.liquidFiles,
+    });
+  };
+
+  // Handle regenerating the theme.
+  const handleRegenerate = () => {
+    setGeneratedTheme(null);
+    handleGenerateTheme();
+  };
+
+  // If theme is generated, show the preview view.
+  if (generatedTheme) {
+    return (
+      <div className="space-y-6">
+        {/* Header with actions. */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold text-2xl">
+              {generatedTheme.themeName}
+            </h2>
+            <p className="text-muted-foreground text-sm">
+              Generated with {Object.keys(generatedTheme.liquidFiles).length}{" "}
+              files
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handleRegenerate}
+              disabled={isGenerating}
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2
+                    className="mr-2 size-4 animate-spin"
+                    aria-hidden="true"
+                  />
+                  Regenerating...
+                </>
+              ) : (
+                <>
+                  <Wand2 className="mr-2 size-4" aria-hidden="true" />
+                  Regenerate
+                </>
+              )}
+            </Button>
+            <Button onClick={handleSaveTheme} disabled={isSaving}>
+              {isSaving ? (
+                <>
+                  <Loader2
+                    className="mr-2 size-4 animate-spin"
+                    aria-hidden="true"
+                  />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 size-4" aria-hidden="true" />
+                  Save Theme
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {/* Preview and file tree layout. */}
+        <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
+          {/* Main preview. */}
+          <div className="h-[600px]">
+            <ThemePreview
+              liquidFiles={generatedTheme.liquidFiles}
+              colorScheme={{
+                primaryColor: data.colorStyle.primaryColor,
+                secondaryColor: data.colorStyle.secondaryColor,
+                accentColor: data.colorStyle.accentColor,
+              }}
+              brandName={data.brandInfo.brandName || "Your Brand"}
+            />
+          </div>
+
+          {/* File tree sidebar. */}
+          <div className="h-[600px]">
+            <FileTree
+              liquidFiles={generatedTheme.liquidFiles}
+              selectedFile={selectedFile}
+              onFileSelect={setSelectedFile}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Default view: review wizard data and generate button.
   return (
     <Card className="border-0 shadow-none">
       <CardHeader className="px-0">
@@ -265,11 +411,9 @@ export function ReviewStep() {
             <p className="mb-2 font-medium text-sm">What happens next?</p>
             <ul className="space-y-1 text-muted-foreground text-sm">
               <li>• AI will generate a complete Shopify Liquid theme</li>
-              <li>• You&apos;ll be able to preview and edit the result</li>
+              <li>• You&apos;ll see a preview of your generated theme</li>
               <li>• Generation typically takes 30-60 seconds</li>
-              <li>
-                • You can make changes using the visual editor after generation
-              </li>
+              <li>• You can save the theme or regenerate if needed</li>
             </ul>
           </CardContent>
         </Card>
